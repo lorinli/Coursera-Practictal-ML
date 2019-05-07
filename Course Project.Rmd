@@ -1,0 +1,98 @@
+#Course Project 
+
+rm(list = ls (all = TRUE))
+
+library(caret)
+
+## 1 Import data & understanding data
+training = read.csv("C:/Users/e00637a/Desktop/Lorin/Self-development/R Machine Learning/pml-training.csv")
+
+testing = read.csv("C:/Users/e00637a/Desktop/Lorin/Self-development/R Machine Learning/pml-testing.csv")
+
+dim(training); dim(testing)
+
+names(training); names(testing)
+
+head(training, 10)
+
+str(training); str(testing)
+
+summary(training); summary(testing)
+
+summary(training$classe); summary(testing$classe)
+
+#  Testing data has no value for classe!  #
+
+## 2 Split training Data into Tranining and Testing, leave testing as final test
+set.seed(1039)
+
+inTrain = createDataPartition(training$classe, p = 3/4)[[1]]
+
+preTraining = training[ inTrain,]
+
+preTesting = training[-inTrain,]
+
+dim(preTraining); dim(preTesting)
+
+## 3 Variables analysis
+## 1) Missing Rate
+na_flag = apply(is.na(training), 2, sum)
+
+trainingClean = preTraining[,which(na_flag <(14718*0.85) )]
+
+### 85% missing as threshold for filter ###
+
+dim(trainingClean)
+
+### 14718 93; filter out 57 variables ###
+ 
+## 2) Abnormal value
+f = function(x) sum(x=="#DIV/0!", x=="")
+
+an_flag = apply(trainingClean ,2,f)
+
+trainingClean2 = trainingClean[,which(an_flag <(14718*0.85))]
+
+### 85% abnormal as threshold for filter ###
+
+dim(trainingClean2)
+### 14718 60; filter out 33 variables ###
+
+trainingDev = subset(trainingClean2,select=-c(X,user_name,cvtd_timestamp,new_window,classe))
+
+str(trainingDev)
+
+###	Best Approach ###
+## 4 PCA + RF 
+preProc =preProcess(trainingDev, method ="pca", thresh=0.80) 
+
+trainPC =predict(preProc, trainingDev)
+
+Dev = data.frame(subset(preTraining, select =classe), trainPC)
+
+summary(Dev)
+
+modelFit = train(classe~.,method ="rf", data=Dev)
+
+dim(preTesting)
+
+testPC = predict(preProc, preTesting[,c(names(trainingDev))])
+
+Tes = data.frame(subset(preTesting, select=classe), testPC)
+
+confusionMatrix(Tes$classe, predict(modelFit, Tes))
+
+###	Accuracy : 0.9741     	###
+
+## 5 Apply on testing Data (without classe value)
+testFinal = predict(preProc, testing[,c(names(trainingDev))])
+
+preResult = predict(modelFit, testFinal)
+
+print(preResult)
+
+## [1] B A B A A E D B A A B C B A E E A B B B  ##
+
+
+
+
