@@ -1,0 +1,87 @@
+---
+title: "Course Project "
+author: "Yi.LI"
+date: "2019/5/7"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1 Import data & understanding data
+
+1st Step: Import data & understanding data
+Found that: 1) In training data, target "Classe" has 5 values, and 2) in testing data has no value (NA)
+
+```{r import}
+rm(list = ls (all = TRUE))
+library(caret)
+training = read.csv("C:/Users/e00637a/Desktop/Lorin/Self-development/R Machine Learning/pml-training.csv")
+testing = read.csv("C:/Users/e00637a/Desktop/Lorin/Self-development/R Machine Learning/pml-testing.csv")
+dim(training); dim(testing)
+summary(training$classe); summary(testing$classe)
+```
+
+
+## 2 Split training Data into Tranining and Testing, leave testing as final test
+
+
+```{r split}
+set.seed(1039)
+inTrain = createDataPartition(training$classe, p = 3/4)[[1]]
+preTraining = training[ inTrain,]
+preTesting = training[-inTrain,]
+dim(preTraining); dim(preTesting)
+```
+
+
+## 3 Variables analysis
+check the missing value and abnormal value rate for all variables, and exclude variables with missing rate or abnormal value rate >= 85%
+Result: filter out 57 variables with high missing rate; filter out 33 variables with high abnormal rate; 
+
+```{r analysis}
+na_flag = apply(is.na(training), 2, sum)
+trainingClean = preTraining[,which(na_flag <(14718*0.85) )]
+dim(trainingClean)
+
+
+## 2) Abnormal value
+f = function(x) sum(x=="#DIV/0!", x=="")
+an_flag = apply(trainingClean ,2,f)
+trainingClean2 = trainingClean[,which(an_flag <(14718*0.85))]
+dim(trainingClean2)
+
+trainingDev = subset(trainingClean2,select=-c(X,user_name,cvtd_timestamp,new_window,classe))
+dim(trainingDev)
+```
+
+## 4 PCA + RF 
+Choose random forest as modelling methodology, but firstly conduct a PCA because there are still too many variables and may have high correlations
+Model accuracy in testing data is: 0.9741
+
+```{r modelling}
+preProc =preProcess(trainingDev, method ="pca", thresh=0.80) 
+trainPC =predict(preProc, trainingDev)
+Dev = data.frame(subset(preTraining, select =classe), trainPC)
+dim(Dev)
+modelFit = train(classe~.,method ="rf", data=Dev)
+
+dim(preTesting)
+testPC = predict(preProc, preTesting[,c(names(trainingDev))])
+Tes = data.frame(subset(preTesting, select=classe), testPC)
+confusionMatrix(Tes$classe, predict(modelFit, Tes))
+```
+
+
+
+## 5 Apply on final testing Data (without classe value)
+Prediction result in 20 test samples: B A B A A E D B A A B C B A E E A B B B  ##
+```{r predict}
+testFinal = predict(preProc, testing[,c(names(trainingDev))])
+preResult = predict(modelFit, testFinal)
+print(preResult)
+```
+
+
+
